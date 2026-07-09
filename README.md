@@ -34,7 +34,7 @@ Autonomous business assistant for adult content creators. Manages content planni
 8. **Publisher** — posts to allowed adult platforms for traffic  
 9. **Dashboard API** — KPIs, tasks, health  
 
-## Quick start
+## Quick start (local)
 
 ```bash
 cp .env.example .env
@@ -45,8 +45,18 @@ npm run db:migrate
 npm run dev
 ```
 
-API: `http://localhost:3100/api/health`  
-WS: `ws://localhost:3100/ws`
+## Railway (production)
+
+See **[docs/RAILWAY.md](docs/RAILWAY.md)**.
+
+1. Push this repo to GitHub  
+2. Railway → Deploy from GitHub → add **Postgres** + **Redis**  
+3. Set `API_KEY`, `PRIMARY_TRAFFIC_URL`, `DATABASE_URL`, `REDIS_URL`, `AUTONOMY_ENABLED=true`  
+4. Health: `https://YOUR-APP.up.railway.app/health`
+
+Public health (no auth): `GET /health`  
+API: `GET /api/dashboard` with header `x-api-key`  
+Webhooks: `POST /api/webhooks/mission` with `x-webhook-secret`
 
 ## Phases
 
