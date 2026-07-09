@@ -15,5 +15,8 @@ tmp/
 data/lilly-raw/**
 !data/lilly-raw/README.md
 data/lilly-dataset/
+data/lilly-lora/
+data/lilly-lora-train.*
 Pics/
+lilly-train-venv/
 !data/.gitkeep

@@ -15,6 +15,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "dataset:prepare": "tsx scripts/prepare-dataset.ts",
     "dataset:status": "tsx scripts/dataset-status.ts",
+    "train:lora": "lilly-train-venv\\Scripts\\python.exe scripts\\train_lilly_lora.py",
     "start:prod": "node server.cjs"
   },
   "engines": {

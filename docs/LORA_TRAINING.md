@@ -41,9 +41,34 @@ npm run dataset:status
 
 ## 2. Train on the 5060 (GPU session)
 
-Install a LoRA trainer (e.g. **Kohya_ss** GUI on Windows).
+### Built-in trainer (recommended)
 
-### Starter settings (SDXL LoRA, ~8GB)
+Already set up in this repo (Python 3.11 venv + CUDA torch):
+
+```powershell
+cd C:\Lilly-OS
+# one-shot
+.\scripts\run_train_lora.bat
+
+# or:
+.\lilly-train-venv\Scripts\python.exe scripts\train_lilly_lora.py --train_steps 400
+```
+
+| Setting | Default |
+|---------|---------|
+| Base | Stable Diffusion 1.5 |
+| Resolution | 512 |
+| Rank | 16 |
+| Steps | 400 (~40–60 min on 5060) |
+| Output | `data\lilly-lora\lillyissilly-lora.safetensors` |
+
+Watch progress:
+
+```powershell
+Get-Content C:\Lilly-OS\data\lilly-lora-train.err -Tail 5 -Wait
+```
+
+### Alternative: Kohya_ss GUI (SDXL, higher quality)
 
 | Setting | Value |
 |---------|--------|
@@ -52,12 +77,8 @@ Install a LoRA trainer (e.g. **Kohya_ss** GUI on Windows).
 | Network rank (dim) | 16–32 |
 | Learning rate | ~1e-4 |
 | Steps | 1000–2000 |
-| Batch | 1 + gradient accumulation |
-| Caption | must include `lillyissilly` |
 
 **Time:** ~2–8 hours on a 5060.
-
-**Output:** e.g. `lillyissilly-lora.safetensors`
 
 When training finishes → **you can turn the GPU off** until the next fine-tune.
 
