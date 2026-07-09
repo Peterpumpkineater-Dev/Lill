@@ -11,19 +11,43 @@ import { logger, childLogger } from "./core/logger";
 
 const log = childLogger("bootstrap");
 
-async function startHttpOnly(reason: string): Promise<void> {
-  log.warn({ reason, missing: config.missing }, "starting setup mode (HTTP only)");
+function resolvePublicDir(): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path") as typeof import("path");
+  const fs = require("fs") as typeof import("fs");
+  const candidates = [
+    path.join(__dirname, "..", "public"),
+    path.join(process.cwd(), "public"),
+    path.join(__dirname, "public"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(path.join(c, "chat.html"))) return c;
+  }
+  return candidates[0];
+}
 
+async function startHttpOnly(reason: string): Promise<void> {
+  log.warn(
+    { reason, missing: config.missing, port: config.server.port },
+    "starting setup mode (HTTP only)"
+  );
+
+  const path = await import("path");
   const app = express();
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: true }));
   app.use(express.json());
+
+  const publicDir = resolvePublicDir();
+  app.use(express.static(publicDir));
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
       status: "setup",
       message: "Lilly is up but needs Postgres + Redis linked on Railway",
       missing: config.missing,
+      port: config.server.port,
+      talk: "/chat",
       selfRun: {
         autonomy: "full when DB+Redis ready",
         persona: "chat as Lilly",
@@ -37,8 +61,12 @@ async function startHttpOnly(reason: string): Promise<void> {
         step5: "Optional: LLM_API_KEY, FAL_KEY, MEDIA_ENABLED=true",
         step6: "Redeploy",
       },
-      version: "1.1.0",
+      version: "1.2.1",
     });
+  });
+
+  app.get("/chat", (_req, res) => {
+    res.sendFile(path.join(publicDir, "chat.html"));
   });
 
   app.get("/", (_req, res) => {
@@ -46,7 +74,9 @@ async function startHttpOnly(reason: string): Promise<void> {
       name: "Lilly OS",
       mode: "setup",
       health: "/health",
+      talk: "/chat",
       missing: config.missing,
+      port: config.server.port,
     });
   });
 
@@ -60,7 +90,10 @@ async function startHttpOnly(reason: string): Promise<void> {
 
   const server = http.createServer(app);
   server.listen(config.server.port, config.server.host, () => {
-    log.info({ port: config.server.port, mode: "setup" }, "Lilly OS listening (setup mode)");
+    log.info(
+      { port: config.server.port, host: config.server.host, mode: "setup" },
+      "Lilly OS listening (setup mode)"
+    );
   });
 
   const shutdown = (signal: string) => {
@@ -249,12 +282,12 @@ async function startFull(): Promise<void> {
   });
 
   // Training web UI (2 people)
-  // dist/index.js → ../public ; tsx src/index.ts → ../public
-  const publicDir = path.join(__dirname, "..", "public");
+  const publicDir = resolvePublicDir();
   app.use(express.static(publicDir));
   app.get("/chat", (_req, res) => {
     res.sendFile(path.join(publicDir, "chat.html"));
   });
+  log.info({ publicDir, port: config.server.port }, "static + chat routes ready");
 
   const { createTrainingChatRouter } = await import("./api/routes/training-chat");
   app.use("/api/public/chat", createTrainingChatRouter(registry));

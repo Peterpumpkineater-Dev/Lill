@@ -47,6 +47,10 @@ const onRailway = Boolean(
 if (!process.env.NODE_ENV && onRailway) {
   process.env.NODE_ENV = "production";
 }
+// Railway public networking defaults to 3000 — match if PORT unset
+if (!process.env.PORT && onRailway) {
+  process.env.PORT = "3000";
+}
 
 const bool = (def: string) =>
   z
@@ -58,7 +62,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default(onRailway ? "production" : "development"),
-  PORT: z.coerce.number().default(3100),
+  PORT: z.coerce.number().default(onRailway ? 3000 : 3100),
   HOST: z.string().default("0.0.0.0"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   /** Explicit opt-in for pino-pretty (never required in production image) */
