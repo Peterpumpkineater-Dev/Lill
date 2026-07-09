@@ -30,12 +30,17 @@ services:
   api:
     build: .
     ports:
-      - "3100:3100"
+      - "3000:3000"
     env_file:
       - .env
     environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
       DATABASE_URL: postgresql://lilly:lilly_secret@postgres:5432/lilly_os
       REDIS_URL: redis://redis:6379
+      API_KEY: dev-lilly-api-key-change-me
+      PRIMARY_TRAFFIC_URL: https://onlyfans.com/lillyissilly
     depends_on:
       postgres:
         condition: service_healthy

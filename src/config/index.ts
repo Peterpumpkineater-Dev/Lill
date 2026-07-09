@@ -1,5 +1,6 @@
 import { z } from "zod";
 import dotenv from "dotenv";
+import { validateInfraEnv } from "../infra/env-validation";
 
 dotenv.config();
 
@@ -149,17 +150,26 @@ export const env = loadEnv();
 const dbUrl = env.DATABASE_URL || "";
 const redisUrl = env.REDIS_URL || "";
 
+const infraStatus = validateInfraEnv({
+  databaseUrl: dbUrl,
+  redisUrl,
+  production: env.NODE_ENV === "production" || onRailway,
+});
+
 export const config = {
   env: env.NODE_ENV,
   isProd: env.NODE_ENV === "production",
   isDev: env.NODE_ENV === "development",
   /** Only true when LOG_PRETTY=true — never auto-enable in production images */
   logPretty: env.LOG_PRETTY,
-  ready: Boolean(dbUrl && redisUrl),
-  missing: [
-    !dbUrl ? "DATABASE_URL (add PostgreSQL on Railway canvas)" : null,
-    !redisUrl ? "REDIS_URL (add Redis on Railway canvas)" : null,
-  ].filter(Boolean) as string[],
+  /** True only when DB+Redis are set and not invalid localhost in production */
+  ready: infraStatus.ok,
+  missing: infraStatus.missing.length
+    ? infraStatus.missing
+    : infraStatus.errors.length
+      ? ["INVALID_INFRA_URLS"]
+      : [],
+  infra: infraStatus,
   server: {
     port: env.PORT,
     host: env.HOST,

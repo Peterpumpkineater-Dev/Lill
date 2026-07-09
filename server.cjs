@@ -81,16 +81,66 @@ function coreHandler(req, res) {
   const { pathname } = parseUrl(req.url || "/", true);
 
   if (pathname === "/health" || pathname === "/healthz") {
+    // Core always answers; full app may enrich via appHandler for /health when attached
+    // Prefer app handler when full mode so postgres/redis live checks run
+    if (appHandler && (bootMode === "full" || bootMode === "setup")) {
+      return appHandler(req, res);
+    }
+    const missing = [];
+    if (!process.env.DATABASE_URL && !process.env.DATABASE_PRIVATE_URL) {
+      missing.push("DATABASE_URL");
+    }
+    if (!process.env.REDIS_URL && !process.env.REDIS_PRIVATE_URL) {
+      missing.push("REDIS_URL");
+    }
+    const redisUrl = process.env.REDIS_URL || "";
+    const errors = [];
+    if (redisUrl.includes("localhost") || redisUrl.includes("127.0.0.1")) {
+      errors.push(
+        "REDIS_URL is localhost — on Railway use Redis service reference, not redis://localhost:6379"
+      );
+    }
     sendJson(res, 200, {
       ok: true,
       status: bootMode === "full" ? "ok" : bootMode,
       bootMode,
+      server: {
+        ok: true,
+        listenPort: PORT,
+        uptimeSeconds: Math.floor(process.uptime()),
+      },
+      postgres: {
+        configured: Boolean(process.env.DATABASE_URL || process.env.DATABASE_PRIVATE_URL),
+        ok: false,
+        error: missing.includes("DATABASE_URL")
+          ? "DATABASE_URL not set — use ${{Postgres.DATABASE_URL}} or Variable Reference"
+          : "pending full app attach for live check",
+      },
+      redis: {
+        configured: Boolean(process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL),
+        ok: false,
+        error:
+          errors[0] ||
+          (missing.includes("REDIS_URL")
+            ? "REDIS_URL not set — use ${{Redis.REDIS_URL}} or Variable Reference (never localhost on Railway)"
+            : "pending full app attach for live check"),
+      },
+      env: {
+        missing,
+        errors,
+        hints: [
+          "DATABASE_URL=${{Postgres.DATABASE_URL}}",
+          "REDIS_URL=${{Redis.REDIS_URL}}",
+          "HOST=0.0.0.0",
+          "PORT must match Railway Networking target port",
+        ],
+      },
       listenPort: PORT,
       envPort: process.env.PORT || null,
       host: HOST,
       bootError,
       talk: "/chat",
-      version: "1.3.1-canary",
+      version: "1.4.0",
       pid: process.pid,
       uptimeSeconds: Math.floor(process.uptime()),
     });

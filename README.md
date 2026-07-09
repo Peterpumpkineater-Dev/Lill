@@ -47,14 +47,21 @@ npm run dev
 
 ## Railway (production)
 
-**Ordered setup:** **[docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md)**  
-Also: [docs/RAILWAY.md](docs/RAILWAY.md) · [docs/SELF_RUN.md](docs/SELF_RUN.md) · [docs/LORA_TRAINING.md](docs/LORA_TRAINING.md)
+**Docs:** [docs/RAILWAY.md](docs/RAILWAY.md) · [docs/LOCAL_INFRA.md](docs/LOCAL_INFRA.md) · [docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md)
 
-1. Deploy from GitHub `Peterpumpkineater-Dev/Lill`  
-2. Add **Postgres** + **Redis**, link `DATABASE_URL` / `REDIS_URL`  
-3. Set `API_KEY`, `PRIMARY_TRAFFIC_URL`, `AUTONOMY_ENABLED=true`, `AUTONOMY_LEVEL=full`  
-4. Health: `GET /health` → `"status":"ok"`  
-5. Chat: `POST /api/chat` · Media: `POST /api/media/image`
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+```
+
+**Never** set `REDIS_URL=redis://localhost:6379` on Railway.
+
+1. Deploy from GitHub  
+2. Create **Postgres** + **Redis** in the same project  
+3. Reference their URLs into Lilly (see RAILWAY.md)  
+4. `HOST=0.0.0.0`, `PORT=3000` (match Networking)  
+5. `GET /health` → `postgres.ok` + `redis.ok`  
+6. Chat UI: `/chat`
 
 ### Training media (your PC)
 

@@ -8,6 +8,8 @@ import path from "path";
 import type { IncomingMessage, ServerResponse } from "http";
 import { config } from "./config";
 import { logger, childLogger } from "./core/logger";
+import { logInfraStatus } from "./infra/env-validation";
+import { buildHealthReport } from "./infra/health";
 
 const log = childLogger("app");
 
@@ -44,7 +46,8 @@ function resolvePublicDir(): string {
 }
 
 async function buildSetupApp(reason: string): Promise<CreateAppResult> {
-  log.warn({ reason, missing: config.missing }, "building setup Express app");
+  logInfraStatus(log);
+  log.warn({ reason, missing: config.missing, infra: config.infra }, "building setup Express app");
   const app = express();
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: true }));
@@ -53,16 +56,16 @@ async function buildSetupApp(reason: string): Promise<CreateAppResult> {
   const publicDir = resolvePublicDir();
   app.use(express.static(publicDir));
 
-  app.get("/health", (_req, res) => {
-    res.status(200).json({
-      status: "setup",
-      message: "Lilly core is up — link Postgres + Redis for full mode",
-      missing: config.missing,
+  app.get("/health", async (_req, res) => {
+    const report = await buildHealthReport({
       listenPort: config.server.port,
-      envPort: process.env.PORT ?? null,
+    });
+    res.status(200).json({
+      ...report,
+      status: "setup",
+      message: "Lilly is up — fix DATABASE_URL / REDIS_URL for full mode",
       reason,
       talk: "/chat",
-      version: "1.3.0",
     });
   });
 
@@ -77,6 +80,7 @@ async function buildSetupApp(reason: string): Promise<CreateAppResult> {
       health: "/health",
       talk: "/chat",
       missing: config.missing,
+      infra: config.infra,
     });
   });
 
@@ -84,7 +88,14 @@ async function buildSetupApp(reason: string): Promise<CreateAppResult> {
     res.status(503).json({
       error: "setup incomplete",
       missing: config.missing,
-      hint: "Add PostgreSQL and Redis, set DATABASE_URL and REDIS_URL",
+      errors: config.infra.errors,
+      hints: config.infra.hints,
+      required: {
+        DATABASE_URL:
+          "Railway: Variable Reference → Postgres → DATABASE_URL  OR  DATABASE_URL=${{Postgres.DATABASE_URL}}",
+        REDIS_URL:
+          "Railway: Variable Reference → Redis → REDIS_URL  OR  REDIS_URL=${{Redis.REDIS_URL}}  — never redis://localhost:6379 on Railway",
+      },
     });
   });
 
@@ -104,7 +115,7 @@ async function buildFullApp(): Promise<CreateAppResult> {
   const { AgentRegistry } = await import("./core/agent-registry");
   const { MemorySystem } = await import("./core/memory");
   const { MemoryRepository } = await import("./db/repositories/memory.repo");
-  const { closeDb, checkDb } = await import("./db/pool");
+  const { closeDb } = await import("./db/pool");
   const { runMigrations } = await import("./db/migrate");
   const { createApiRouter } = await import("./api/routes");
   const { createWebhookRouter } = await import("./api/routes/webhooks");
@@ -252,27 +263,20 @@ async function buildFullApp(): Promise<CreateAppResult> {
   app.use(express.static(publicDir));
 
   app.get("/health", async (_req, res) => {
-    const dbOk = await checkDb();
-    let redisOk = false;
-    try {
-      redisOk = (await redis.ping()) === "PONG";
-    } catch {
-      redisOk = false;
-    }
-    const ok = dbOk && redisOk;
-    const budgets = await budget.snapshot();
-    res.status(ok ? 200 : 503).json({
-      status: ok ? "ok" : "degraded",
-      db: dbOk,
-      redis: redisOk,
+    const report = await buildHealthReport({
+      redis,
       listenPort: config.server.port,
-      envPort: process.env.PORT ?? null,
+    });
+    const budgets = await budget.snapshot();
+    const httpStatus =
+      report.status === "ok" ? 200 : report.status === "degraded" ? 200 : 503;
+    res.status(httpStatus).json({
+      ...report,
       autonomy: config.autonomy.enabled,
       autonomyLevel: config.autonomy.level,
       llm: config.llm.enabled,
       media: config.media.enabled,
       budgets,
-      version: "1.3.0",
       chatUi: "/chat",
     });
   });
@@ -322,8 +326,14 @@ async function buildFullApp(): Promise<CreateAppResult> {
 }
 
 export async function createExpressApp(): Promise<CreateAppResult> {
+  logInfraStatus(log);
+
   if (!config.ready) {
-    return buildSetupApp(config.missing.join("; ") || "missing DATABASE_URL/REDIS_URL");
+    const reason = [
+      ...config.infra.missing.map((m) => `MISSING ${m}`),
+      ...config.infra.errors,
+    ].join("; ") || "DATABASE_URL and REDIS_URL required for full mode";
+    return buildSetupApp(reason);
   }
   try {
     return await buildFullApp();
