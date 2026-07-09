@@ -99,8 +99,16 @@ export type Env = z.infer<typeof envSchema>;
 function loadEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    throw new Error(`Invalid environment configuration: ${msg}`);
+    const missing = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+    const hint = [
+      "Railway requires:",
+      "  1) Add PostgreSQL plugin → set DATABASE_URL=${{Postgres.DATABASE_URL}}",
+      "  2) Add Redis plugin → set REDIS_URL=${{Redis.REDIS_URL}}",
+      "  3) Set API_KEY to a long random secret (Variables tab)",
+      "  4) Set PRIMARY_TRAFFIC_URL to your traffic link",
+      "See docs/RAILWAY.md",
+    ].join("\n");
+    throw new Error(`Invalid environment configuration:\n${missing.join("\n")}\n\n${hint}`);
   }
   return parsed.data;
 }
