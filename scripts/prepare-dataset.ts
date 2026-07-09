@@ -53,10 +53,12 @@ function ensureDirs(): void {
 
 function defaultCaption(filename: string, type: "image" | "video"): string {
   const base = path.basename(filename, path.extname(filename)).replace(/[_-]+/g, " ");
+  // Identity-first captions so LoRA learns ONE person (Lilly only — no friends yet)
+  const identity = `${TRIGGER}, solo, one woman only, same person, adult woman content creator`;
   if (type === "video") {
-    return `${TRIGGER}, adult woman content creator, video frame, ${base}`.trim();
+    return `${identity}, video frame, ${base}`.trim();
   }
-  return `${TRIGGER}, adult woman content creator, photo, high quality, ${base}`.trim();
+  return `${identity}, photo, high quality, ${base}`.trim();
 }
 
 function main(): void {

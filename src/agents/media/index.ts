@@ -4,6 +4,7 @@ import { config } from "../../config";
 import {
   buildLillyImagePrompt,
   createMediaAdapter,
+  lillyNegativePrompt,
   type IMediaAdapter,
 } from "../../services/media";
 import type { BudgetService } from "../../services/budget";
@@ -118,7 +119,7 @@ export class MediaAgent extends BaseAgent {
     try {
       const result = await this.adapter.generateImage({
         prompt,
-        negativePrompt: "child, underage, minor, low quality, blurry",
+        negativePrompt: lillyNegativePrompt(),
       });
       if (this.budget) await this.budget.recordImage(1);
       this.log.info(

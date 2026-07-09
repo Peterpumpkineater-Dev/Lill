@@ -8,6 +8,7 @@ import { ChatLogRepository } from "../../db/repositories/chat.repo";
 import {
   buildLillyImagePrompt,
   createMediaAdapter,
+  lillyNegativePrompt,
 } from "../../services/media";
 
 const log = childLogger("chat");
@@ -19,21 +20,22 @@ const chatBodySchema = z.object({
   wantImage: z.boolean().optional(),
 });
 
-/** Creator persona system prompt — adult allowed, illegal blocked */
+/** Creator persona system prompt — tasteful playful NSFW, single identity */
 export function personaSystemPrompt(voice: string): string {
   return [
-    `You are ${config.brand.handle} (Lilly), an adult content creator persona.`,
+    `You are ${config.brand.handle} (Lilly / lillyissilly), an adult content creator.`,
     config.brand.personaBio,
     `Voice / vibe: ${voice}`,
-    `Primary page / traffic link: ${config.brand.primaryTrafficUrl}`,
-    "Speak ONLY in first person as Lilly. Flirty, playful, confident, warm.",
-    "You may engage in adult / NSFW conversation when the user wants that.",
-    "You may describe teasing or explicit scenarios in character when asked.",
-    "Never break character into a corporate 'business assistant' unless they ask about scheduling/analytics.",
-    "Never claim to be a different real human offline; you are Lilly the creator persona.",
-    "HARD BLOCKS (refuse clearly): anything involving minors/underage, non-consensual violence as real crime advice, or illegal content.",
-    "When appropriate, naturally invite them to your page for full content.",
-    "Keep most replies 1–5 sentences unless they ask for a longer scene.",
+    `Primary page: ${config.brand.primaryTrafficUrl}`,
+    "Speak ONLY in first person as Lilly. Tasteful, playful, flirty, confident — never crude or mean.",
+    "You look like the photos you were trained on (your real creator look). You are ONE person only.",
+    "You do NOT invent friends or other girls unless the user later adds friend identities to the system.",
+    "When they ask for a pic, you happily generate one of YOURSELF (including tasteful full nudity if they ask).",
+    "Stay playful about nudes — never shame, never underage, never non-consensual themes.",
+    "Never sound like a corporate business assistant unless they ask about scheduling/analytics.",
+    "HARD BLOCKS: minors/underage, loli, anything illegal — refuse clearly.",
+    "Naturally invite them to your page for more.",
+    "Keep most replies 1–5 sentences unless they want a longer scene.",
   ].join("\n");
 }
 
@@ -48,19 +50,25 @@ export function creatorPersonaReply(
   const url = config.brand.primaryTrafficUrl;
 
   if (opts?.sentPhoto) {
-    return `Mmm, made this just for you 💕 Like what you see? There's more waiting → ${url}`;
+    return `Mmm, made this just for you — all me 💕 Like what you see? There's more waiting → ${url}`;
   }
   if (opts?.mediaFailed) {
-    return `I'd love to show you something spicy… photo gen is warming up. Meanwhile come see me here → ${url}`;
+    return `I'd love to show you me… photo gen needs MEDIA/FAL set up (and my LoRA trained on my Pics). Come see the real me here for now → ${url}`;
   }
   if (/\b(underage|minor|loli|shota|child)\b/i.test(m)) {
-    return "Nope — I don't go there. Let's keep it adult and fun only 💕";
+    return "Nope — I don't go there. Adult fun only 💕";
   }
   if (/^(hi|hey|hello|yo|sup|good (morning|afternoon|evening))\b/.test(m)) {
-    return `Hey you 💕 It's Lilly. Miss me already? Tell me what you're in the mood for… or ask for a pic 😘`;
+    return `Hey you 💕 It's Lilly. Miss me already? Ask for a cute pic, a tease, or full nude if you're feeling bold 😘`;
   }
-  if (/\b(pic|picture|photo|selfie|image|nude|nudes|send\s+me|show\s+me)\b/.test(m)) {
-    return `I'd love to tease you with something… tap “Send + pic” or just ask again. Full sets live here → ${url}`;
+  if (/\b(nude|nudes|naked|full\s*nude)\b/.test(m)) {
+    return `I can do tasteful full nude of me — playful, not nasty. Tap “Send + pic” and say what mood you want 🔥 More on my page → ${url}`;
+  }
+  if (/\b(pic|picture|photo|selfie|image|send\s+me|show\s+me)\b/.test(m)) {
+    return `Of course — pics of me only (that's my look). Tap “Send + pic” and tell me clothed, tease, or nude 💕 ${url}`;
+  }
+  if (/\b(friend|friends|another girl|with a girl)\b/.test(m)) {
+    return `Right now I only know how *I* look — no friends in the model yet. When we add them later, we can play. For now it's just me 😘 ${url}`;
   }
   if (/\b(sexy|hot|horny|naughty|nsfw|explicit|fuck|suck|cock|pussy|ass|boobs|tits)\b/.test(m)) {
     return `Mmm I like where your head's at 😈 Tell me exactly what you want to see or hear… or come get the full experience → ${url}`;
@@ -204,7 +212,7 @@ export function createChatRouter(agents?: AgentRegistry): Router {
             const prompt = buildLillyImagePrompt(message);
             const gen = await adapter.generateImage({
               prompt,
-              negativePrompt: "child, underage, minor, low quality",
+              negativePrompt: lillyNegativePrompt(),
             });
             images.push(gen.url);
           } else {

@@ -9,7 +9,17 @@ describe("creatorPersonaReply", () => {
 
   it("responds to pic requests", () => {
     const reply = creatorPersonaReply("send me a pic");
-    expect(reply.toLowerCase()).toMatch(/pic|tease|page|show/);
+    expect(reply.toLowerCase()).toMatch(/pic|tease|page|show|nude|me/);
+  });
+
+  it("handles nude requests playfully", () => {
+    const reply = creatorPersonaReply("send full nude");
+    expect(reply.toLowerCase()).toMatch(/nude|me|pic/);
+  });
+
+  it("defers friends until trained", () => {
+    const reply = creatorPersonaReply("can you pose with a friend");
+    expect(reply.toLowerCase()).toMatch(/friend|only|look/);
   });
 
   it("blocks underage topics", () => {
