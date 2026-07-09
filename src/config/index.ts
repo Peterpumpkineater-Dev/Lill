@@ -120,6 +120,10 @@ const envSchema = z.object({
 
   WEBHOOK_SECRET: z.string().optional().default(""),
 
+  CHAT_ENABLED: bool("true"),
+  /** Shared password for the 2-person training web chat (not the full API key) */
+  CHAT_PASSWORD: z.string().min(4).default("lilly-train-2026"),
+
   WS_PATH: z.string().default("/ws"),
   API_KEY: z.string().min(8).default("lilly_4xrDfd0XltWntEJ4VPk2xm818YlKoJXee14yoDxy2w8"),
   CORS_ORIGINS: z.string().default("*"),
@@ -208,6 +212,10 @@ export const config = {
     replicateToken: env.REPLICATE_API_TOKEN,
   },
   webhookSecret: env.WEBHOOK_SECRET,
+  chat: {
+    enabled: env.CHAT_ENABLED,
+    password: env.CHAT_PASSWORD,
+  },
   logLevel: env.LOG_LEVEL,
 } as const;
 

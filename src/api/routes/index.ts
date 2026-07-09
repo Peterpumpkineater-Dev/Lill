@@ -11,6 +11,8 @@ import {
   DraftRepository,
 } from "../../db/repositories/metrics.repo";
 import { pluginRegistry } from "../../core/plugin";
+import { ChatLogRepository } from "../../db/repositories/chat.repo";
+import { createTrainingAdminRouter } from "./training-chat";
 
 export function createApiRouter(
   agents: AgentRegistry,
@@ -24,6 +26,7 @@ export function createApiRouter(
   const jobs = new PublishJobRepository();
   const reports = new ReportRepository();
   const drafts = new DraftRepository();
+  const chatLogs = new ChatLogRepository();
 
   router.get("/health", async (_req: Request, res: Response) => {
     const health = await dashboard.health();
@@ -40,17 +43,59 @@ export function createApiRouter(
     res.status(result.ok ? 200 : 400).json(result);
   });
 
-  // ── Persona chat (Lilly as a person) ───────────────
+  // ── Persona chat (Lilly as a person) + training log ─
   router.post("/chat", async (req, res) => {
+    const userId = String(req.body?.userId ?? "operator");
+    const userName = String(req.body?.name ?? req.body?.userId ?? "operator");
+    const sessionId = String(req.body?.sessionId ?? `op:${userId}`);
+    const message = String(req.body?.message ?? "");
+    const wantImage = Boolean(req.body?.wantImage);
+
+    if (message) {
+      try {
+        await chatLogs.insert({
+          userId,
+          userName,
+          sessionId,
+          role: "user",
+          content: message,
+          channel: String(req.body?.channel ?? "operator"),
+          metadata: { wantImage },
+        });
+      } catch {
+        // table may not exist yet mid-migrate
+      }
+    }
+
     const result = await agents.invoke("persona", "chat", {
-      message: req.body?.message,
-      sessionId: req.body?.sessionId ?? "operator",
-      userId: req.body?.userId ?? "operator",
+      message,
+      sessionId,
+      userId,
       channel: req.body?.channel ?? "operator",
-      wantImage: Boolean(req.body?.wantImage),
+      wantImage,
     });
+
+    if (result.ok && result.data?.reply) {
+      try {
+        await chatLogs.insert({
+          userId,
+          userName,
+          sessionId,
+          role: "assistant",
+          content: String(result.data.reply),
+          images: (result.data.images as string[]) ?? [],
+          channel: String(req.body?.channel ?? "operator"),
+        });
+      } catch {
+        // ignore log failures
+      }
+    }
+
     res.status(result.ok ? 200 : 400).json(result);
   });
+
+  // Training data export (API key)
+  router.use("/training", createTrainingAdminRouter());
 
   // ── Media generation ───────────────────────────────
   router.get("/media/status", async (_req, res) => {

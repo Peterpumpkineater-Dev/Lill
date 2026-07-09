@@ -107,7 +107,20 @@ Until Fal/LoRA is set, media uses **stub** placeholders so the loop still runs.
 
 ---
 
-## 5. Talk to Lilly + request a pic
+## 5. Talk to Lilly (2 trainers — web UI)
+
+1. Set `CHAT_PASSWORD` on Railway (default: `lilly-train-2026` — change it)
+2. Open: `https://YOUR-APP.up.railway.app/chat`
+3. Each person uses their **name** + password
+4. All chats are saved for training export
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://YOUR-APP.up.railway.app/api/training/export -o lilly-chat-train.jsonl
+```
+
+See `docs/TRAINING_CHAT.md`.
+
+API:
 
 ```bash
 curl -X POST https://YOUR-APP.up.railway.app/api/chat ^

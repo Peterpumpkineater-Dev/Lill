@@ -227,21 +227,37 @@ async function startFull(): Promise<void> {
       llm: config.llm.enabled,
       media: config.media.enabled,
       budgets,
-      version: "1.1.0",
+      version: "1.2.0",
+      chatUi: "/chat",
     });
   });
+
+  const path = await import("path");
 
   app.get("/", (_req, res) => {
     res.json({
       name: "Lilly OS",
-      version: "1.1.0",
+      version: "1.2.0",
       mode: "full",
       health: "/health",
+      talk: "/chat",
       chat: "POST /api/chat",
       media: "POST /api/media/image",
       fan: "POST /api/fan/chat",
+      trainingExport: "GET /api/training/export",
     });
   });
+
+  // Training web UI (2 people)
+  // dist/index.js → ../public ; tsx src/index.ts → ../public
+  const publicDir = path.join(__dirname, "..", "public");
+  app.use(express.static(publicDir));
+  app.get("/chat", (_req, res) => {
+    res.sendFile(path.join(publicDir, "chat.html"));
+  });
+
+  const { createTrainingChatRouter } = await import("./api/routes/training-chat");
+  app.use("/api/public/chat", createTrainingChatRouter(registry));
 
   app.use("/api/webhooks", createWebhookRouter(registry));
   app.use("/api", apiKeyAuth, createApiRouter(registry, dashboard));
@@ -264,7 +280,7 @@ async function startFull(): Promise<void> {
     );
   });
 
-  await eventBus.emit("system.started", { version: "1.1.0", at: new Date() });
+  await eventBus.emit("system.started", { version: "1.2.0", at: new Date() });
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");
