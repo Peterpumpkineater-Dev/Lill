@@ -2,11 +2,11 @@
   "name": "lilly-os",
   "version": "1.0.0",
   "description": "Lilly OS — autonomous business assistant for adult content creators",
-  "main": "dist/server.js",
+  "main": "server.cjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node server.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -14,7 +14,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "dataset:prepare": "tsx scripts/prepare-dataset.ts",
-    "start:prod": "node dist/server.js"
+    "start:prod": "node server.cjs"
   },
   "engines": {
     "node": ">=20"

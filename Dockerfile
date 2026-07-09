@@ -15,13 +15,15 @@ RUN npm run build && npm prune --omit=dev
 FROM base AS runtime
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-# PORT is injected by Railway at runtime — do not hardcode
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
+COPY --from=build /app/server.cjs ./server.cjs
 COPY --from=build /app/src/db/migrations ./dist/db/migrations
 COPY --from=build /app/public ./public
+# Railway sets PORT at runtime; default 3000 for local docker runs
 EXPOSE 3000
 USER node
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/server.js"]
+# Canary listens first; full app loads from dist/app.js if present
+CMD ["node", "server.cjs"]
