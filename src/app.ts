@@ -10,6 +10,7 @@ import { config } from "./config";
 import { logger, childLogger } from "./core/logger";
 import { logInfraStatus } from "./infra/env-validation";
 import { buildHealthReport } from "./infra/health";
+import { createChatRouter } from "./api/routes/chat";
 
 const log = childLogger("app");
 
@@ -79,10 +80,14 @@ async function buildSetupApp(reason: string): Promise<CreateAppResult> {
       mode: "setup",
       health: "/health",
       talk: "/chat",
+      chat: "POST /api/chat",
       missing: config.missing,
       infra: config.infra,
     });
   });
+
+  // Chat works even without Postgres/Redis (LLM or local persona fallback)
+  app.use("/api/chat", createChatRouter());
 
   app.use("/api", (_req, res) => {
     res.status(503).json({
@@ -98,6 +103,18 @@ async function buildSetupApp(reason: string): Promise<CreateAppResult> {
       },
     });
   });
+
+  // Body-parse and route errors → JSON, never an HTML stack trace
+  app.use(
+    (
+      err: Error & { status?: number },
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction
+    ) => {
+      res.status(err.status ?? 500).json({ error: err.message || "internal error" });
+    }
+  );
 
   return {
     handler: app as unknown as CreateAppResult["handler"],
@@ -298,6 +315,7 @@ async function buildFullApp(): Promise<CreateAppResult> {
     });
   });
 
+  app.use("/api/chat", createChatRouter());
   app.use("/api/public/chat", createTrainingChatRouter(registry));
   app.use("/api/webhooks", createWebhookRouter(registry));
   app.use("/api", apiKeyAuth, createApiRouter(registry, dashboard));

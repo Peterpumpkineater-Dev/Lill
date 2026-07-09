@@ -2,96 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Talk to Lilly</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lilly OS — Chat</title>
   <style>
     :root {
       --bg: #0f0a12;
       --panel: #1a1220;
-      --pink: #ff4d8d;
-      --pink-dim: #c23a6a;
+      --accent: #ff4d8d;
+      --accent-dim: #c23a6a;
       --text: #f5eef2;
       --muted: #a8919c;
       --bubble-me: #3a1f32;
-      --bubble-her: #25182c;
+      --bubble-lilly: #25182c;
       --border: #3d2a38;
+      --error: #ff8fab;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: radial-gradient(1200px 600px at 50% -10%, #3a1530 0%, var(--bg) 55%);
       color: var(--text);
-      min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
     header {
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
-      background: rgba(15,10,18,0.9);
+      background: rgba(15, 10, 18, 0.9);
       backdrop-filter: blur(8px);
-      position: sticky;
-      top: 0;
-      z-index: 2;
     }
-    header h1 {
-      margin: 0;
-      font-size: 1.1rem;
-      font-weight: 650;
-      letter-spacing: 0.02em;
-    }
-    header p {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: 0.8rem;
-    }
-    #login, #chat {
+    header h1 { margin: 0; font-size: 1.1rem; font-weight: 650; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 0.8rem; }
+    main {
       width: 100%;
       max-width: 720px;
       margin: 0 auto;
       flex: 1;
       display: flex;
       flex-direction: column;
-    }
-    #login {
-      padding: 24px 16px;
-      gap: 12px;
-      justify-content: center;
-    }
-    label {
-      font-size: 0.85rem;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 4px;
-    }
-    input[type="text"], input[type="password"] {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      color: var(--text);
-      font-size: 1rem;
-    }
-    button {
-      border: 0;
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      background: linear-gradient(135deg, var(--pink), var(--pink-dim));
-      color: white;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    button.secondary {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
+      min-height: 0;
     }
     #messages {
       flex: 1;
@@ -105,187 +56,152 @@
       max-width: 85%;
       padding: 10px 12px;
       border-radius: 14px;
-      line-height: 1.4;
+      line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
-    }
-    .msg.me {
-      align-self: flex-end;
-      background: var(--bubble-me);
       border: 1px solid var(--border);
     }
-    .msg.her {
-      align-self: flex-start;
-      background: var(--bubble-her);
-      border: 1px solid var(--border);
-    }
-    .msg .who {
-      font-size: 0.7rem;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-    .msg img {
-      display: block;
-      max-width: 100%;
-      border-radius: 10px;
-      margin-top: 8px;
-    }
+    .msg.me { align-self: flex-end; background: var(--bubble-me); }
+    .msg.lilly { align-self: flex-start; background: var(--bubble-lilly); }
+    .msg .who { font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+    .msg.typing { color: var(--muted); font-style: italic; }
     #composer {
       display: flex;
       gap: 8px;
-      padding: 12px 16px 20px;
+      padding: 12px 16px;
       border-top: 1px solid var(--border);
-      background: rgba(15,10,18,0.95);
+      background: rgba(15, 10, 18, 0.95);
     }
     #composer input {
       flex: 1;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
     }
-    .row { display: flex; gap: 8px; }
-    .row button { flex: 1; }
-    .error {
-      color: #ff8fab;
+    #composer input:focus { border-color: var(--accent-dim); }
+    #composer button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+      color: white;
+    }
+    #composer button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #error {
+      color: var(--error);
       font-size: 0.85rem;
       min-height: 1.2em;
+      padding: 0 16px 12px;
+      margin: 0;
     }
-    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Talk to Lilly</h1>
-    <p>Training chat — conversations are saved to improve her.</p>
+    <h1>Lilly OS</h1>
+    <p>Your creator business assistant</p>
   </header>
 
-  <section id="login">
-    <div>
-      <label for="name">Your name</label>
-      <input id="name" type="text" placeholder="e.g. Alex" autocomplete="nickname" />
-    </div>
-    <div>
-      <label for="password">Chat password</label>
-      <input id="password" type="password" placeholder="Shared training password" autocomplete="current-password" />
-    </div>
-    <p class="error" id="loginError"></p>
-    <button id="enterBtn" type="button">Enter chat</button>
-  </section>
-
-  <section id="chat" class="hidden">
+  <main>
     <div id="messages"></div>
+    <p id="error"></p>
     <div id="composer">
-      <input id="message" type="text" placeholder="Message Lilly…" autocomplete="off" />
-      <button id="sendBtn" type="button">Send</button>
+      <input id="input" type="text" placeholder="Message Lilly…" autocomplete="off" autofocus />
+      <button id="send" type="button">Send</button>
     </div>
-    <div class="row" style="padding: 0 16px 16px">
-      <button id="picBtn" class="secondary" type="button">Send + ask for pic</button>
-    </div>
-    <p class="error" id="chatError" style="padding: 0 16px 12px"></p>
-  </section>
+  </main>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-    const state = { name: "", password: "" };
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("input");
+    const sendEl = document.getElementById("send");
+    const errorEl = document.getElementById("error");
 
-    function loadSaved() {
-      try {
-        const s = JSON.parse(localStorage.getItem("lilly-train") || "{}");
-        if (s.name) $("name").value = s.name;
-        if (s.password) $("password").value = s.password;
-      } catch {}
-    }
-
-    function saveCreds() {
-      localStorage.setItem(
-        "lilly-train",
-        JSON.stringify({ name: state.name, password: state.password })
-      );
-    }
-
-    function addMessage(role, text, images = []) {
+    function addMessage(role, text) {
       const el = document.createElement("div");
-      el.className = "msg " + (role === "me" ? "me" : "her");
+      el.className = "msg " + (role === "me" ? "me" : "lilly");
       const who = document.createElement("div");
       who.className = "who";
-      who.textContent = role === "me" ? state.name : "Lilly";
+      who.textContent = role === "me" ? "You" : "Lilly";
       el.appendChild(who);
       const body = document.createElement("div");
       body.textContent = text;
       el.appendChild(body);
-      for (const url of images) {
-        const img = document.createElement("img");
-        img.src = url;
-        img.alt = "Lilly media";
-        img.loading = "lazy";
-        el.appendChild(img);
-      }
-      $("messages").appendChild(el);
-      $("messages").scrollTop = $("messages").scrollHeight;
+      messagesEl.appendChild(el);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return el;
     }
 
-    async function send(wantImage) {
-      const message = $("message").value.trim();
-      if (!message) return;
-      $("chatError").textContent = "";
-      $("sendBtn").disabled = true;
-      $("picBtn").disabled = true;
+    function addTyping() {
+      const el = document.createElement("div");
+      el.className = "msg lilly typing";
+      el.textContent = "Lilly is typing…";
+      messagesEl.appendChild(el);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return el;
+    }
+
+    let sending = false;
+
+    async function send() {
+      const message = inputEl.value.trim();
+      if (!message || sending) return;
+
+      sending = true;
+      errorEl.textContent = "";
+      sendEl.disabled = true;
+      inputEl.disabled = true;
       addMessage("me", message);
-      $("message").value = "";
+      inputEl.value = "";
+      const typing = addTyping();
 
       try {
-        const res = await fetch("/api/public/chat/message", {
+        const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: state.name,
-            password: state.password,
-            message,
-            wantImage: !!wantImage,
-          }),
+          body: JSON.stringify({ message }),
         });
-        const data = await res.json();
+
+        let data = {};
+        try { data = await res.json(); } catch {}
+
+        typing.remove();
+
         if (!res.ok) {
-          $("chatError").textContent = data.error || data.message || "Send failed";
+          errorEl.textContent = data.error || ("Request failed (" + res.status + ")");
           return;
         }
-        addMessage("her", data.reply || "(no reply)", data.images || []);
+        addMessage("lilly", data.reply || "(no reply)");
       } catch (e) {
-        $("chatError").textContent = "Network error — is Lilly online?";
+        typing.remove();
+        errorEl.textContent = "Network error — is the server running? Check /health.";
       } finally {
-        $("sendBtn").disabled = false;
-        $("picBtn").disabled = false;
-        $("message").focus();
+        sending = false;
+        sendEl.disabled = false;
+        inputEl.disabled = false;
+        inputEl.focus();
       }
     }
 
-    $("enterBtn").onclick = () => {
-      const name = $("name").value.trim();
-      const password = $("password").value;
-      if (!name) {
-        $("loginError").textContent = "Enter your name";
-        return;
+    sendEl.addEventListener("click", send);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send();
       }
-      if (!password) {
-        $("loginError").textContent = "Enter the chat password";
-        return;
-      }
-      state.name = name;
-      state.password = password;
-      saveCreds();
-      $("login").classList.add("hidden");
-      $("chat").classList.remove("hidden");
-      addMessage(
-        "her",
-        "Hey… I'm Lilly. Talk to me — this helps train me. Ask for a pic anytime 💕"
-      );
-      $("message").focus();
-    };
-
-    $("sendBtn").onclick = () => send(false);
-    $("picBtn").onclick = () => send(true);
-    $("message").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") send(false);
     });
 
-    loadSaved();
+    addMessage(
+      "lilly",
+      "Hey! I'm Lilly, your creator business assistant. Ask me about content planning, scheduling, or analytics — or just say hi."
+    );
   </script>
 </body>
 </html>

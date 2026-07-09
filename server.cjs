@@ -77,6 +77,38 @@ a{color:#ff4d8d}
 </div>
 </body></html>`;
 
+function fallbackPersonaReply(message) {
+  const m = String(message || "").toLowerCase();
+  if (/^(hi|hey|hello|yo|sup)\b/.test(m)) {
+    return "Hey! I'm Lilly, your creator business assistant. The full app is still booting, but I'm here — ask me again in a moment for smarter answers.";
+  }
+  return (
+    "Got your message! I'm running in minimal mode while the full app boots. " +
+    "Check /health for status and try again shortly."
+  );
+}
+
+function handleFallbackChat(req, res) {
+  let body = "";
+  req.on("data", (chunk) => {
+    body += chunk;
+    if (body.length > 100_000) req.destroy();
+  });
+  req.on("end", () => {
+    try {
+      const parsed = JSON.parse(body || "{}");
+      const message = String(parsed.message || "").trim();
+      if (!message) {
+        sendJson(res, 400, { error: "message required" });
+        return;
+      }
+      sendJson(res, 200, { reply: fallbackPersonaReply(message) });
+    } catch (_) {
+      sendJson(res, 400, { error: "invalid JSON body" });
+    }
+  });
+}
+
 function coreHandler(req, res) {
   const { pathname } = parseUrl(req.url || "/", true);
 
@@ -194,6 +226,12 @@ function coreHandler(req, res) {
       listenPort: PORT,
       message: "Canary is live. Full app attaches after boot.",
     });
+    return;
+  }
+
+  if (pathname === "/api/chat" && req.method === "POST") {
+    // Full app not attached — answer with the minimal persona so the chat UI still works
+    handleFallbackChat(req, res);
     return;
   }
 
