@@ -169,14 +169,21 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
+// Bind without host first if needed — always 0.0.0.0 for Railway
+const listenHost = HOST === "localhost" ? "0.0.0.0" : HOST;
+
+server.listen(PORT, listenHost, () => {
+  const addr = server.address();
   console.log(
     JSON.stringify({
       msg: "Lilly canary listening",
       listenPort: PORT,
       envPort: process.env.PORT || null,
-      host: HOST,
+      host: listenHost,
+      address: addr,
       pid: process.pid,
+      cwd: process.cwd(),
+      node: process.version,
     })
   );
 });

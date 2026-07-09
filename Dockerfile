@@ -1,29 +1,17 @@
-# ─── Lilly OS ─────────────────────────────────────────
-FROM node:20-alpine AS base
+# Ultra-minimal canary image — no TypeScript build required.
+# Proves Railway networking. Full app can be re-enabled after /health works.
+FROM node:20-alpine
 WORKDIR /app
-RUN apk add --no-cache dumb-init
 
-FROM base AS deps
-COPY package.json package-lock.json* ./
-RUN npm ci
-
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build && npm prune --omit=dev
-
-FROM base AS runtime
+# Run as root for canary (avoids permission surprises); switch back later if needed
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/package.json ./
-COPY --from=build /app/server.cjs ./server.cjs
-COPY --from=build /app/src/db/migrations ./dist/db/migrations
-COPY --from=build /app/public ./public
-# Railway sets PORT at runtime; default 3000 for local docker runs
+
+COPY server.cjs ./server.cjs
+COPY public ./public
+
+# Optional: full app if present (won't fail if missing)
+# Not copying dist in this canary-only image
+
 EXPOSE 3000
-USER node
-ENTRYPOINT ["dumb-init", "--"]
-# Canary listens first; full app loads from dist/app.js if present
 CMD ["node", "server.cjs"]

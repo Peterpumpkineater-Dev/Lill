@@ -3,10 +3,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Zero-dep canary first — always binds PORT before loading full app
-startCommand = "node server.cjs"
-# Healthcheck disabled until networking proven (re-enable after /health works)
-# healthcheckPath = "/health"
-# healthcheckTimeout = 120
+# Let Dockerfile CMD run only — do not override with startCommand
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+restartPolicyMaxRetries = 5
