@@ -11,4 +11,8 @@ coverage/
 .vscode/
 *.swp
 tmp/
-data/
+# Training media (local only — do not commit private content)
+data/lilly-raw/**
+!data/lilly-raw/README.md
+data/lilly-dataset/
+!data/.gitkeep

@@ -47,16 +47,21 @@ npm run dev
 
 ## Railway (production)
 
-See **[docs/RAILWAY.md](docs/RAILWAY.md)**.
+**Ordered setup:** **[docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md)**  
+Also: [docs/RAILWAY.md](docs/RAILWAY.md) · [docs/SELF_RUN.md](docs/SELF_RUN.md) · [docs/LORA_TRAINING.md](docs/LORA_TRAINING.md)
 
-1. Push this repo to GitHub  
-2. Railway → Deploy from GitHub → add **Postgres** + **Redis**  
-3. Set `API_KEY`, `PRIMARY_TRAFFIC_URL`, `DATABASE_URL`, `REDIS_URL`, `AUTONOMY_ENABLED=true`  
-4. Health: `https://YOUR-APP.up.railway.app/health`
+1. Deploy from GitHub `Peterpumpkineater-Dev/Lill`  
+2. Add **Postgres** + **Redis**, link `DATABASE_URL` / `REDIS_URL`  
+3. Set `API_KEY`, `PRIMARY_TRAFFIC_URL`, `AUTONOMY_ENABLED=true`, `AUTONOMY_LEVEL=full`  
+4. Health: `GET /health` → `"status":"ok"`  
+5. Chat: `POST /api/chat` · Media: `POST /api/media/image`
 
-Public health (no auth): `GET /health`  
-API: `GET /api/dashboard` with header `x-api-key`  
-Webhooks: `POST /api/webhooks/mission` with `x-webhook-secret`
+### Training media (your PC)
+
+```powershell
+# Drop images/videos into data\lilly-raw\
+npm run dataset:prepare
+```
 
 ## Phases
 

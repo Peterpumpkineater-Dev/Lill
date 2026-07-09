@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "start:prod": "node dist/db/migrate.js && node dist/index.js"
+    "dataset:prepare": "tsx scripts/prepare-dataset.ts",
+    "start:prod": "node dist/index.js"
   },
   "engines": {
     "node": ">=20"
