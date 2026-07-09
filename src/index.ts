@@ -11,6 +11,18 @@ import { logger, childLogger } from "./core/logger";
 
 const log = childLogger("bootstrap");
 
+function errDetail(err: unknown): Record<string, unknown> {
+  if (!(err instanceof Error)) return { err: String(err) };
+  const e = err as Error & { code?: string; detail?: string; severity?: string };
+  return {
+    errMessage: e.message,
+    errName: e.name,
+    errCode: e.code,
+    errDetail: e.detail,
+    errStack: e.stack?.split("\n").slice(0, 8).join("\n"),
+  };
+}
+
 function resolvePublicDir(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path") as typeof import("path");
@@ -46,7 +58,9 @@ async function startHttpOnly(reason: string): Promise<void> {
       status: "setup",
       message: "Lilly is up but needs Postgres + Redis linked on Railway",
       missing: config.missing,
-      port: config.server.port,
+      listenPort: config.server.port,
+      host: config.server.host,
+      envPort: process.env.PORT ?? null,
       talk: "/chat",
       selfRun: {
         autonomy: "full when DB+Redis ready",
@@ -58,10 +72,10 @@ async function startHttpOnly(reason: string): Promise<void> {
         step2: "Canvas → + Create → Database → Redis",
         step3: "Lilly → Variables → DATABASE_URL reference to Postgres",
         step4: "Lilly → Variables → REDIS_URL reference to Redis",
-        step5: "Optional: LLM_API_KEY, FAL_KEY, MEDIA_ENABLED=true",
-        step6: "Redeploy",
+        step5: "Networking target port must match listenPort (usually 3000)",
+        step6: "Optional: LLM_API_KEY, FAL_KEY, MEDIA_ENABLED=true",
       },
-      version: "1.2.1",
+      version: "1.2.2",
     });
   });
 
@@ -137,11 +151,21 @@ async function startFull(): Promise<void> {
   type AgentContext = import("./agents/base").AgentContext;
   type AgentName = import("./types/domain").AgentName;
 
+  log.info(
+    {
+      listenPort: config.server.port,
+      envPort: process.env.PORT ?? null,
+      hasDatabaseUrl: Boolean(config.db.url),
+      hasRedisUrl: Boolean(config.redis.url),
+    },
+    "full boot starting"
+  );
+
   try {
     await runMigrations();
     log.info("migrations ok");
   } catch (err) {
-    log.error({ err }, "migration failed");
+    log.error({ ...errDetail(err), hasDatabaseUrl: Boolean(config.db.url) }, "migration failed");
     throw err;
   }
 
@@ -149,8 +173,15 @@ async function startFull(): Promise<void> {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
     lazyConnect: true,
+    connectTimeout: 15_000,
   });
-  await redis.connect();
+  try {
+    await redis.connect();
+    log.info("redis connected");
+  } catch (err) {
+    log.error({ ...errDetail(err) }, "redis connect failed");
+    throw err;
+  }
 
   const budget = new BudgetService(redis);
   const memory = new MemorySystem(new MemoryRepository(), redis, config.redis.prefix);
@@ -255,12 +286,14 @@ async function startFull(): Promise<void> {
       status: ok ? "ok" : "degraded",
       db: dbOk,
       redis: redisOk,
+      listenPort: config.server.port,
+      envPort: process.env.PORT ?? null,
       autonomy: config.autonomy.enabled,
       autonomyLevel: config.autonomy.level,
       llm: config.llm.enabled,
       media: config.media.enabled,
       budgets,
-      version: "1.2.0",
+      version: "1.2.2",
       chatUi: "/chat",
     });
   });
@@ -303,7 +336,9 @@ async function startFull(): Promise<void> {
   server.listen(config.server.port, config.server.host, () => {
     log.info(
       {
-        port: config.server.port,
+        listenPort: config.server.port,
+        envPort: process.env.PORT ?? null,
+        host: config.server.host,
         autonomy: config.autonomy.enabled,
         level: config.autonomy.level,
         media: config.media.enabled,
@@ -313,7 +348,7 @@ async function startFull(): Promise<void> {
     );
   });
 
-  await eventBus.emit("system.started", { version: "1.2.0", at: new Date() });
+  await eventBus.emit("system.started", { version: "1.2.2", at: new Date() });
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");
@@ -336,12 +371,15 @@ async function main(): Promise<void> {
   try {
     await startFull();
   } catch (err) {
-    logger.error({ err }, "full boot failed — falling back to setup HTTP");
+    logger.error(
+      { ...errDetail(err) },
+      "full boot failed — falling back to setup HTTP"
+    );
     await startHttpOnly(err instanceof Error ? err.message : String(err));
   }
 }
 
 main().catch((err) => {
-  logger.fatal({ err }, "fatal bootstrap error");
+  logger.fatal({ ...errDetail(err) }, "fatal bootstrap error");
   process.exit(1);
 });

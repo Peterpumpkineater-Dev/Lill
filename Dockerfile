@@ -15,8 +15,7 @@ RUN npm run build && npm prune --omit=dev
 FROM base AS runtime
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-# Railway injects PORT (often 3000); do not hardcode listen port
-ENV PORT=3000
+# PORT is injected by Railway at runtime — do not hardcode
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./

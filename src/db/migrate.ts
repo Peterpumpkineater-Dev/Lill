@@ -45,7 +45,16 @@ export async function runMigrations(): Promise<void> {
       log.info({ file }, "migration applied");
     } catch (err) {
       await client.query("ROLLBACK");
-      log.error({ err, file }, "migration failed");
+      const e = err as Error & { code?: string; detail?: string };
+      log.error(
+        {
+          file,
+          errMessage: e.message,
+          errCode: e.code,
+          errDetail: e.detail,
+        },
+        "migration failed"
+      );
       throw err;
     } finally {
       client.release();

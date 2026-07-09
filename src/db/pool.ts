@@ -4,15 +4,31 @@ import { childLogger } from "../core/logger";
 
 const log = childLogger("db");
 
+function shouldUseSsl(url: string): boolean {
+  if (!url) return false;
+  if (process.env.PGSSL === "false" || process.env.DB_SSL === "false") return false;
+  if (process.env.PGSSL === "true" || process.env.DB_SSL === "true") return true;
+  // Railway / managed Postgres almost always need SSL
+  if (/railway\.app|rlwy\.net|amazonaws\.com|neon\.tech|supabase/i.test(url)) return true;
+  if (/sslmode=require/i.test(url)) return true;
+  if (config.isProd) return true;
+  return false;
+}
+
+const dbUrl = config.db.url;
+
 export const pool = new Pool({
-  connectionString: config.db.url || undefined,
+  connectionString: dbUrl || undefined,
   max: config.db.poolMax,
-  // Don't crash process on idle errors when URL missing
-  ...(config.db.url ? {} : { connectionTimeoutMillis: 1 }),
+  connectionTimeoutMillis: dbUrl ? 15_000 : 1,
+  ssl: dbUrl && shouldUseSsl(dbUrl) ? { rejectUnauthorized: false } : undefined,
 });
 
 pool.on("error", (err) => {
-  log.error({ err }, "unexpected pool error");
+  log.error(
+    { errMessage: err.message, errCode: (err as NodeJS.ErrnoException).code },
+    "unexpected pool error"
+  );
 });
 
 export async function query<T extends QueryResultRow = QueryResultRow>(
