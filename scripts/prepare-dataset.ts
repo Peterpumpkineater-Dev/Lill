@@ -8,7 +8,13 @@ import fs from "fs";
 import path from "path";
 
 const ROOT = path.resolve(__dirname, "..");
-const RAW = path.join(ROOT, "data", "lilly-raw");
+/** Prefer data/lilly-raw; also accepts C:\Lilly-OS\Pics if present */
+const RAW_CANDIDATES = [
+  path.join(ROOT, "data", "lilly-raw"),
+  path.join(ROOT, "Pics"),
+];
+const RAW =
+  RAW_CANDIDATES.find((d) => fs.existsSync(d)) || path.join(ROOT, "data", "lilly-raw");
 const OUT = path.join(ROOT, "data", "lilly-dataset");
 const OUT_IMG = path.join(OUT, "images");
 const OUT_VID = path.join(OUT, "videos");

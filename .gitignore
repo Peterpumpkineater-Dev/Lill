@@ -15,4 +15,5 @@ tmp/
 data/lilly-raw/**
 !data/lilly-raw/README.md
 data/lilly-dataset/
+Pics/
 !data/.gitkeep
