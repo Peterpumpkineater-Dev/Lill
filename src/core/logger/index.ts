@@ -1,20 +1,25 @@
 import pino from "pino";
 import { config } from "../../config/index";
 
+/**
+ * Production: plain JSON logs (no pino-pretty dependency).
+ * Local pretty: set LOG_PRETTY=true (requires pino-pretty in devDependencies).
+ */
 export const logger = pino({
   name: "lilly-os",
   level: config.logLevel,
-  transport:
-    config.isDev
-      ? {
+  ...(config.logPretty
+    ? {
+        transport: {
           target: "pino-pretty",
           options: {
             colorize: true,
             translateTime: "SYS:standard",
             ignore: "pid,hostname",
           },
-        }
-      : undefined,
+        },
+      }
+    : {}),
   base: {
     service: "lilly-os",
     env: config.env,

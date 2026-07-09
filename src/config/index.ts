@@ -38,6 +38,16 @@ if (!process.env.DATABASE_URL) {
   if (d) process.env.DATABASE_URL = d;
 }
 
+// Railway / production hosts: default NODE_ENV to production when unset
+const onRailway = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+    process.env.RAILWAY_PROJECT_ID ||
+    process.env.RAILWAY_SERVICE_ID
+);
+if (!process.env.NODE_ENV && onRailway) {
+  process.env.NODE_ENV = "production";
+}
+
 const bool = (def: string) =>
   z
     .string()
@@ -45,10 +55,14 @@ const bool = (def: string) =>
     .default(def);
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default(onRailway ? "production" : "development"),
   PORT: z.coerce.number().default(3100),
   HOST: z.string().default("0.0.0.0"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  /** Explicit opt-in for pino-pretty (never required in production image) */
+  LOG_PRETTY: bool("false"),
 
   DATABASE_URL: z.string().optional().default(""),
   DB_POOL_MAX: z.coerce.number().default(20),
@@ -131,6 +145,8 @@ export const config = {
   env: env.NODE_ENV,
   isProd: env.NODE_ENV === "production",
   isDev: env.NODE_ENV === "development",
+  /** Only true when LOG_PRETTY=true — never auto-enable in production images */
+  logPretty: env.LOG_PRETTY,
   ready: Boolean(dbUrl && redisUrl),
   missing: [
     !dbUrl ? "DATABASE_URL (add PostgreSQL on Railway canvas)" : null,
