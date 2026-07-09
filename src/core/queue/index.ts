@@ -5,7 +5,11 @@ import { childLogger } from "../logger";
 const log = childLogger("queue");
 
 function parseRedisConnection(): ConnectionOptions {
-  const url = new URL(config.redis.url);
+  const raw = config.redis.url;
+  if (!raw) {
+    throw new Error("REDIS_URL not configured");
+  }
+  const url = new URL(raw);
   return {
     host: url.hostname,
     port: Number(url.port || 6379),
@@ -17,15 +21,22 @@ function parseRedisConnection(): ConnectionOptions {
 export type JobHandler<T> = (data: T, job: Job<T>) => Promise<void>;
 
 export class QueueManager {
-  private connection = parseRedisConnection();
+  private connection: ConnectionOptions | null = null;
   private queues = new Map<string, Queue>();
   private workers = new Map<string, Worker>();
+
+  private getConnection(): ConnectionOptions {
+    if (!this.connection) {
+      this.connection = parseRedisConnection();
+    }
+    return this.connection;
+  }
 
   getQueue(name: string): Queue {
     const key = `${config.redis.prefix}${name}`;
     let q = this.queues.get(key);
     if (!q) {
-      q = new Queue(key, { connection: this.connection });
+      q = new Queue(key, { connection: this.getConnection() });
       this.queues.set(key, q);
     }
     return q;
@@ -67,7 +78,7 @@ export class QueueManager {
         log.debug({ queue: name, jobId: job.id }, "job started");
         await handler(job.data as T, job as Job<T>);
       },
-      { connection: this.connection, concurrency }
+      { connection: this.getConnection(), concurrency }
     );
 
     worker.on("failed", (job, err) => {
@@ -84,14 +95,16 @@ export class QueueManager {
   }
 
   async depth(name: string): Promise<number> {
+    if (!config.redis.url) return 0;
     const queue = this.getQueue(name);
     const counts = await queue.getJobCounts("waiting", "delayed", "active");
     return (counts.waiting ?? 0) + (counts.delayed ?? 0) + (counts.active ?? 0);
   }
 
   async totalDepth(): Promise<number> {
+    if (!config.redis.url) return 0;
     let total = 0;
-    for (const name of ["publish", "analytics", "scheduler", "agents"]) {
+    for (const name of ["publish", "analytics", "scheduler", "agents", "media"]) {
       try {
         total += await this.depth(name);
       } catch {
@@ -106,6 +119,7 @@ export class QueueManager {
     await Promise.all([...this.queues.values()].map((q) => q.close()));
     this.workers.clear();
     this.queues.clear();
+    this.connection = null;
   }
 }
 
@@ -116,4 +130,5 @@ export const QUEUE_NAMES = {
   ANALYTICS: "analytics",
   SCHEDULER: "scheduler",
   AGENTS: "agents",
+  MEDIA: "media",
 } as const;

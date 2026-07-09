@@ -18,6 +18,8 @@ const planSchema = z.object({
         "publisher",
         "dashboard",
         "autonomy",
+        "persona",
+        "media",
       ]),
       title: z.string(),
       description: z.string(),

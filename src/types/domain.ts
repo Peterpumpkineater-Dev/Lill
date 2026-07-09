@@ -10,7 +10,9 @@ export type AgentName =
   | "scheduler"
   | "publisher"
   | "dashboard"
-  | "autonomy";
+  | "autonomy"
+  | "persona"
+  | "media";
 
 export type TaskStatus =
   | "pending"

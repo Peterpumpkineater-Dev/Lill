@@ -1,36 +1,13 @@
+/**
+ * Bootstrap — setup mode uses only light imports.
+ * Full stack is loaded dynamically so missing Redis never crashes on import.
+ */
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import http from "http";
-import pinoHttp from "pino-http";
-import Redis from "ioredis";
 import { config } from "./config";
 import { logger, childLogger } from "./core/logger";
-import { eventBus } from "./core/event-bus";
-import { queueManager } from "./core/queue";
-import { pluginRegistry } from "./core/plugin";
-import { AgentRegistry } from "./core/agent-registry";
-import { MemorySystem } from "./core/memory";
-import { MemoryRepository } from "./db/repositories/memory.repo";
-import { closeDb, checkDb } from "./db/pool";
-import { runMigrations } from "./db/migrate";
-import { createApiRouter } from "./api/routes";
-import { createWebhookRouter } from "./api/routes/webhooks";
-import { attachWebSocket } from "./api/websocket";
-import { apiKeyAuth, errorHandler, notFound } from "./api/middleware";
-import { MissionDirectorAgent } from "./agents/mission-director";
-import { ContentPlannerAgent } from "./agents/content-planner";
-import { CommunityAgent } from "./agents/community";
-import { AnalyticsAgent } from "./agents/analytics";
-import { MemoryManagerAgent } from "./agents/memory-manager";
-import { ComplianceAgent } from "./agents/compliance";
-import { SchedulerAgent } from "./agents/scheduler";
-import { PublisherAgent } from "./agents/publisher";
-import { DashboardAgent } from "./agents/dashboard";
-import { AutonomyAgent } from "./agents/autonomy";
-import { registerPlatformPlugins } from "./services/platforms";
-import type { AgentContext } from "./agents/base";
-import type { AgentName } from "./types/domain";
 
 const log = childLogger("bootstrap");
 
@@ -47,14 +24,20 @@ async function startHttpOnly(reason: string): Promise<void> {
       status: "setup",
       message: "Lilly is up but needs Postgres + Redis linked on Railway",
       missing: config.missing,
+      selfRun: {
+        autonomy: "full when DB+Redis ready",
+        persona: "chat as Lilly",
+        media: "LoRA image gen when MEDIA_ENABLED + FAL_KEY",
+      },
       setup: {
         step1: "Canvas → + Create → Database → PostgreSQL",
         step2: "Canvas → + Create → Database → Redis",
-        step3: "Lilly → Variables → add DATABASE_URL reference to Postgres",
-        step4: "Lilly → Variables → add REDIS_URL reference to Redis",
-        step5: "Redeploy",
+        step3: "Lilly → Variables → DATABASE_URL reference to Postgres",
+        step4: "Lilly → Variables → REDIS_URL reference to Redis",
+        step5: "Optional: LLM_API_KEY, FAL_KEY, MEDIA_ENABLED=true",
+        step6: "Redeploy",
       },
-      version: "1.0.0",
+      version: "1.1.0",
     });
   });
 
@@ -71,16 +54,13 @@ async function startHttpOnly(reason: string): Promise<void> {
     res.status(503).json({
       error: "setup incomplete",
       missing: config.missing,
-      hint: "Add PostgreSQL and Redis on the Railway canvas, link DATABASE_URL and REDIS_URL, then redeploy",
+      hint: "Add PostgreSQL and Redis on Railway, link DATABASE_URL and REDIS_URL",
     });
   });
 
   const server = http.createServer(app);
   server.listen(config.server.port, config.server.host, () => {
-    log.info(
-      { port: config.server.port, mode: "setup" },
-      "Lilly OS listening (setup mode)"
-    );
+    log.info({ port: config.server.port, mode: "setup" }, "Lilly OS listening (setup mode)");
   });
 
   const shutdown = (signal: string) => {
@@ -93,12 +73,42 @@ async function startHttpOnly(reason: string): Promise<void> {
 }
 
 async function startFull(): Promise<void> {
-  // Migrate before serving
+  const pinoHttp = (await import("pino-http")).default;
+  const Redis = (await import("ioredis")).default;
+  const { eventBus } = await import("./core/event-bus");
+  const { queueManager } = await import("./core/queue");
+  const { pluginRegistry } = await import("./core/plugin");
+  const { AgentRegistry } = await import("./core/agent-registry");
+  const { MemorySystem } = await import("./core/memory");
+  const { MemoryRepository } = await import("./db/repositories/memory.repo");
+  const { closeDb, checkDb } = await import("./db/pool");
+  const { runMigrations } = await import("./db/migrate");
+  const { createApiRouter } = await import("./api/routes");
+  const { createWebhookRouter } = await import("./api/routes/webhooks");
+  const { attachWebSocket } = await import("./api/websocket");
+  const { apiKeyAuth, errorHandler, notFound } = await import("./api/middleware");
+  const { MissionDirectorAgent } = await import("./agents/mission-director");
+  const { ContentPlannerAgent } = await import("./agents/content-planner");
+  const { CommunityAgent } = await import("./agents/community");
+  const { AnalyticsAgent } = await import("./agents/analytics");
+  const { MemoryManagerAgent } = await import("./agents/memory-manager");
+  const { ComplianceAgent } = await import("./agents/compliance");
+  const { SchedulerAgent } = await import("./agents/scheduler");
+  const { PublisherAgent } = await import("./agents/publisher");
+  const { DashboardAgent } = await import("./agents/dashboard");
+  const { AutonomyAgent } = await import("./agents/autonomy");
+  const { PersonaAgent } = await import("./agents/persona");
+  const { MediaAgent } = await import("./agents/media");
+  const { registerPlatformPlugins } = await import("./services/platforms");
+  const { BudgetService } = await import("./services/budget");
+  type AgentContext = import("./agents/base").AgentContext;
+  type AgentName = import("./types/domain").AgentName;
+
   try {
     await runMigrations();
     log.info("migrations ok");
   } catch (err) {
-    log.error({ err }, "migration failed — check DATABASE_URL");
+    log.error({ err }, "migration failed");
     throw err;
   }
 
@@ -107,25 +117,14 @@ async function startFull(): Promise<void> {
     enableReadyCheck: true,
     lazyConnect: true,
   });
+  await redis.connect();
 
-  try {
-    await redis.connect();
-  } catch (err) {
-    log.error({ err }, "redis connect failed");
-    throw err;
-  }
-
-  const memory = new MemorySystem(
-    new MemoryRepository(),
-    redis,
-    config.redis.prefix
-  );
+  const budget = new BudgetService(redis);
+  const memory = new MemorySystem(new MemoryRepository(), redis, config.redis.prefix);
 
   try {
     const existingVoice = await memory.brandVoice();
-    if (!existingVoice) {
-      await memory.setBrandVoice(config.brand.voice);
-    }
+    if (!existingVoice) await memory.setBrandVoice(config.brand.voice);
     await memory.remember({
       scope: "brand",
       key: "brand.primary_traffic_url",
@@ -133,25 +132,27 @@ async function startFull(): Promise<void> {
       tags: ["traffic", "brand"],
       importance: 1,
     });
+    await memory.remember({
+      scope: "brand",
+      key: "brand.persona",
+      value: config.brand.personaBio,
+      tags: ["persona", "brand"],
+      importance: 1,
+    });
   } catch (err) {
     log.warn({ err }, "memory bootstrap skipped");
   }
 
   const adapters: Array<{ id: string; adapter: unknown }> = [];
-  registerPlatformPlugins((id, adapter) => {
-    adapters.push({ id, adapter });
-  });
+  registerPlatformPlugins((id, adapter) => adapters.push({ id, adapter }));
   for (const { id, adapter } of adapters) {
     await pluginRegistry.register({
       manifest: {
         id: `platform-${id}`,
         name: `Platform: ${id}`,
         version: "1.0.0",
-        description: `Publishing adapter for ${id}`,
       },
-      activate: (ctx) => {
-        ctx.registerPlatform(id, adapter);
-      },
+      activate: (ctx) => ctx.registerPlatform(id, adapter),
     });
   }
 
@@ -164,9 +165,15 @@ async function startFull(): Promise<void> {
   const registry = new AgentRegistry();
   const dashboard = new DashboardAgent(agentCtx("dashboard"), redis);
   const autonomy = new AutonomyAgent(agentCtx("autonomy"));
-  autonomy.setRegistry(registry);
+  const persona = new PersonaAgent(agentCtx("persona"));
+  const media = new MediaAgent(agentCtx("media"));
 
-  const agentList = [
+  autonomy.setRegistry(registry);
+  persona.setRegistry(registry);
+  persona.setBudget(budget);
+  media.setBudget(budget);
+
+  for (const agent of [
     new MissionDirectorAgent(agentCtx("mission-director")),
     new ContentPlannerAgent(agentCtx("content-planner")),
     new CommunityAgent(agentCtx("community")),
@@ -177,14 +184,13 @@ async function startFull(): Promise<void> {
     new PublisherAgent(agentCtx("publisher")),
     dashboard,
     autonomy,
-  ];
-
-  for (const agent of agentList) {
+    persona,
+    media,
+  ]) {
     registry.register(agent);
   }
 
   await registry.startAll();
-
   for (const name of registry.list()) {
     dashboard.setAgentOnline(name as AgentName, true);
   }
@@ -200,12 +206,7 @@ async function startFull(): Promise<void> {
     })
   );
   app.use(express.json({ limit: "2mb" }));
-  app.use(
-    pinoHttp({
-      logger,
-      autoLogging: config.isDev,
-    })
-  );
+  app.use(pinoHttp({ logger, autoLogging: config.isDev }));
 
   app.get("/health", async (_req, res) => {
     const dbOk = await checkDb();
@@ -216,24 +217,29 @@ async function startFull(): Promise<void> {
       redisOk = false;
     }
     const ok = dbOk && redisOk;
+    const budgets = await budget.snapshot();
     res.status(ok ? 200 : 503).json({
       status: ok ? "ok" : "degraded",
       db: dbOk,
       redis: redisOk,
       autonomy: config.autonomy.enabled,
+      autonomyLevel: config.autonomy.level,
       llm: config.llm.enabled,
-      version: "1.0.0",
+      media: config.media.enabled,
+      budgets,
+      version: "1.1.0",
     });
   });
 
   app.get("/", (_req, res) => {
     res.json({
       name: "Lilly OS",
-      version: "1.0.0",
+      version: "1.1.0",
+      mode: "full",
       health: "/health",
-      api: "/api",
-      webhooks: "/api/webhooks",
-      ws: config.server.wsPath,
+      chat: "POST /api/chat",
+      media: "POST /api/media/image",
+      fan: "POST /api/fan/chat",
     });
   });
 
@@ -249,18 +255,16 @@ async function startFull(): Promise<void> {
     log.info(
       {
         port: config.server.port,
-        host: config.server.host,
         autonomy: config.autonomy.enabled,
+        level: config.autonomy.level,
+        media: config.media.enabled,
         llm: config.llm.enabled,
       },
-      "Lilly OS listening"
+      "Lilly OS listening (full self-run)"
     );
   });
 
-  await eventBus.emit("system.started", {
-    version: "1.0.0",
-    at: new Date(),
-  });
+  await eventBus.emit("system.started", { version: "1.1.0", at: new Date() });
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");
@@ -271,7 +275,6 @@ async function startFull(): Promise<void> {
     await closeDb();
     process.exit(0);
   };
-
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
@@ -281,13 +284,15 @@ async function main(): Promise<void> {
     await startHttpOnly(config.missing.join("; "));
     return;
   }
-  await startFull();
+  try {
+    await startFull();
+  } catch (err) {
+    logger.error({ err }, "full boot failed — falling back to setup HTTP");
+    await startHttpOnly(err instanceof Error ? err.message : String(err));
+  }
 }
 
 main().catch((err) => {
   logger.fatal({ err }, "fatal bootstrap error");
-  // Last resort: still try setup HTTP so healthcheck can show the error
-  startHttpOnly(err instanceof Error ? err.message : String(err)).catch(() => {
-    process.exit(1);
-  });
+  process.exit(1);
 });

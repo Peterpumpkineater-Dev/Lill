@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-/** Railway often injects REDIS_URL or REDIS_PRIVATE_URL */
 function resolveRedisUrl(): string {
   if (process.env.REDIS_URL) return process.env.REDIS_URL;
   if (process.env.REDIS_PRIVATE_URL) return process.env.REDIS_PRIVATE_URL;
@@ -39,13 +38,18 @@ if (!process.env.DATABASE_URL) {
   if (d) process.env.DATABASE_URL = d;
 }
 
+const bool = (def: string) =>
+  z
+    .string()
+    .transform((v) => v === "true")
+    .default(def);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3100),
   HOST: z.string().default("0.0.0.0"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 
-  // Optional until Postgres/Redis plugins are linked on Railway
   DATABASE_URL: z.string().optional().default(""),
   DB_POOL_MAX: z.coerce.number().default(20),
 
@@ -55,42 +59,54 @@ const envSchema = z.object({
   LLM_API_URL: z.string().optional().default(""),
   LLM_API_KEY: z.string().optional().default(""),
   LLM_MODEL: z.string().default("gpt-4o-mini"),
-  LLM_ENABLED: z
-    .string()
-    .transform((v) => v === "true")
-    .default("false"),
+  LLM_ENABLED: bool("false"),
 
-  CREATOR_HANDLE: z.string().default("lilly"),
-  BRAND_VOICE: z.string().default("confident, playful, professional"),
-  PRIMARY_TRAFFIC_URL: z.string().url().or(z.string().min(1)).default("https://example.com"),
+  CREATOR_HANDLE: z.string().default("lillyissilly"),
+  BRAND_VOICE: z
+    .string()
+    .default("playful, confident, warm, flirty but in control"),
+  PRIMARY_TRAFFIC_URL: z
+    .string()
+    .url()
+    .or(z.string().min(1))
+    .default("https://onlyfans.com/lillyissilly"),
   TIMEZONE: z.string().default("America/New_York"),
+  PERSONA_BIO: z
+    .string()
+    .default(
+      "Lilly is an adult content creator. She speaks in first person, never breaks character, and drives interest to her primary page."
+    ),
 
-  PUBLISH_AUTO_APPROVED: z
-    .string()
-    .transform((v) => v === "true")
-    .default("false"),
-  PUBLISH_REQUIRE_COMPLIANCE: z
-    .string()
-    .transform((v) => v === "true")
-    .default("true"),
+  PUBLISH_AUTO_APPROVED: bool("true"),
+  PUBLISH_REQUIRE_COMPLIANCE: bool("true"),
   DEFAULT_POST_INTERVAL_MINUTES: z.coerce.number().default(180),
 
-  AUTONOMY_ENABLED: z
-    .string()
-    .transform((v) => v === "true")
-    .default("false"),
+  AUTONOMY_ENABLED: bool("true"),
   AUTONOMY_INTERVAL_MINUTES: z.coerce.number().default(60),
-  AUTONOMY_LEVEL: z.enum(["supervised", "semi", "full"]).default("semi"),
+  AUTONOMY_LEVEL: z.enum(["supervised", "semi", "full"]).default("full"),
   AUTONOMY_DEFAULT_GOAL: z
     .string()
     .default(
-      "Continuously grow traffic to the primary adult content account via compliant multi-platform posts"
+      "Continuously grow traffic to the primary adult content account via compliant multi-platform posts and self-generated media"
     ),
+  AUTONOMY_GENERATE_MEDIA: bool("true"),
+
+  DAILY_IMAGE_BUDGET: z.coerce.number().default(50),
+  DAILY_TOKEN_BUDGET: z.coerce.number().default(500000),
+  FAN_AUTO_REPLY: bool("false"),
+  FAN_IMAGE_PER_USER_DAY: z.coerce.number().default(3),
+
+  MEDIA_ENABLED: bool("false"),
+  MEDIA_PROVIDER: z.enum(["fal", "replicate", "stub"]).default("stub"),
+  FAL_KEY: z.string().optional().default(""),
+  FAL_IMAGE_MODEL: z.string().default("fal-ai/flux/dev"),
+  LORA_TRIGGER: z.string().default("lillyissilly"),
+  LORA_PATH_OR_URL: z.string().optional().default(""),
+  REPLICATE_API_TOKEN: z.string().optional().default(""),
 
   WEBHOOK_SECRET: z.string().optional().default(""),
 
   WS_PATH: z.string().default("/ws"),
-  // Default so Railway can boot; change in Variables for production security
   API_KEY: z.string().min(8).default("lilly_4xrDfd0XltWntEJ4VPk2xm818YlKoJXee14yoDxy2w8"),
   CORS_ORIGINS: z.string().default("*"),
 });
@@ -115,7 +131,6 @@ export const config = {
   env: env.NODE_ENV,
   isProd: env.NODE_ENV === "production",
   isDev: env.NODE_ENV === "development",
-  /** Full stack ready (Postgres + Redis linked) */
   ready: Boolean(dbUrl && redisUrl),
   missing: [
     !dbUrl ? "DATABASE_URL (add PostgreSQL on Railway canvas)" : null,
@@ -147,6 +162,7 @@ export const config = {
     voice: env.BRAND_VOICE,
     primaryTrafficUrl: env.PRIMARY_TRAFFIC_URL,
     timezone: env.TIMEZONE,
+    personaBio: env.PERSONA_BIO,
   },
   publish: {
     autoApproved: env.PUBLISH_AUTO_APPROVED,
@@ -158,6 +174,22 @@ export const config = {
     intervalMinutes: env.AUTONOMY_INTERVAL_MINUTES,
     level: env.AUTONOMY_LEVEL,
     defaultGoal: env.AUTONOMY_DEFAULT_GOAL,
+    generateMedia: env.AUTONOMY_GENERATE_MEDIA,
+  },
+  budgets: {
+    dailyImages: env.DAILY_IMAGE_BUDGET,
+    dailyTokens: env.DAILY_TOKEN_BUDGET,
+    fanAutoReply: env.FAN_AUTO_REPLY,
+    fanImagesPerUserDay: env.FAN_IMAGE_PER_USER_DAY,
+  },
+  media: {
+    enabled: env.MEDIA_ENABLED,
+    provider: env.MEDIA_PROVIDER,
+    falKey: env.FAL_KEY,
+    falImageModel: env.FAL_IMAGE_MODEL,
+    loraTrigger: env.LORA_TRIGGER,
+    loraPathOrUrl: env.LORA_PATH_OR_URL,
+    replicateToken: env.REPLICATE_API_TOKEN,
   },
   webhookSecret: env.WEBHOOK_SECRET,
   logLevel: env.LOG_LEVEL,

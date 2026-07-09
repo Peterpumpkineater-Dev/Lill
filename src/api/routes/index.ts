@@ -40,6 +40,42 @@ export function createApiRouter(
     res.status(result.ok ? 200 : 400).json(result);
   });
 
+  // ── Persona chat (Lilly as a person) ───────────────
+  router.post("/chat", async (req, res) => {
+    const result = await agents.invoke("persona", "chat", {
+      message: req.body?.message,
+      sessionId: req.body?.sessionId ?? "operator",
+      userId: req.body?.userId ?? "operator",
+      channel: req.body?.channel ?? "operator",
+      wantImage: Boolean(req.body?.wantImage),
+    });
+    res.status(result.ok ? 200 : 400).json(result);
+  });
+
+  // ── Media generation ───────────────────────────────
+  router.get("/media/status", async (_req, res) => {
+    res.json(await agents.invoke("media", "status", {}));
+  });
+
+  router.post("/media/image", async (req, res) => {
+    const result = await agents.invoke("media", "generate_image", {
+      prompt: req.body?.prompt ?? req.body?.request,
+    });
+    res.status(result.ok ? 201 : 400).json(result);
+  });
+
+  // ── Fan channel stub (gated) ───────────────────────
+  router.post("/fan/chat", async (req, res) => {
+    const result = await agents.invoke("persona", "chat", {
+      message: req.body?.message,
+      sessionId: req.body?.sessionId ?? `fan:${req.body?.userId ?? "anon"}`,
+      userId: req.body?.userId ?? "anon",
+      channel: "fan",
+      wantImage: Boolean(req.body?.wantImage),
+    });
+    res.status(result.ok ? 200 : 400).json(result);
+  });
+
   // ── Dashboard aggregate ────────────────────────────
   router.get("/dashboard", async (_req: Request, res: Response) => {
     const [health, kpis, upcoming, recentTasks, recentJobs, plugins] =

@@ -21,6 +21,8 @@ export class DashboardAgent extends BaseAgent {
     publisher: "offline",
     dashboard: "online",
     autonomy: "offline",
+    persona: "offline",
+    media: "offline",
   };
 
   constructor(

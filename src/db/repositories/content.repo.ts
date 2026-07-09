@@ -97,6 +97,7 @@ export class ContentRepository {
       complianceVerdict: ComplianceVerdict | null;
       complianceNotes: string | null;
       metadata: Record<string, unknown>;
+      mediaUrls: string[];
     }>
   ): Promise<ContentItem | null> {
     const res = await query(
@@ -110,6 +111,7 @@ export class ContentRepository {
          compliance_verdict = COALESCE($8, compliance_verdict),
          compliance_notes = COALESCE($9, compliance_notes),
          metadata = COALESCE($10::jsonb, metadata),
+         media_urls = COALESCE($11::jsonb, media_urls),
          updated_at = NOW()
        WHERE id = $1 RETURNING *`,
       [
@@ -123,6 +125,7 @@ export class ContentRepository {
         patch.complianceVerdict !== undefined ? patch.complianceVerdict : null,
         patch.complianceNotes !== undefined ? patch.complianceNotes : null,
         patch.metadata !== undefined ? JSON.stringify(patch.metadata) : null,
+        patch.mediaUrls !== undefined ? JSON.stringify(patch.mediaUrls) : null,
       ]
     );
     return res.rows[0] ? mapContent(res.rows[0]) : null;

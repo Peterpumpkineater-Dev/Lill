@@ -68,7 +68,10 @@ export class AutonomyAgent extends BaseAgent {
           enabled: config.autonomy.enabled,
           level: config.autonomy.level,
           intervalMinutes: config.autonomy.intervalMinutes,
+          generateMedia: config.autonomy.generateMedia,
           llmEnabled: config.llm.enabled,
+          mediaEnabled: config.media.enabled,
+          dailyImageBudget: config.budgets.dailyImages,
         },
       };
     }
@@ -83,6 +86,7 @@ export class AutonomyAgent extends BaseAgent {
     try {
       await this.ensureActiveMission();
       await this.ensureContentPipeline();
+      await this.ensureMediaForUpcoming();
       await this.autoApproveIfAllowed();
       await this.retryFailedPublishes();
       await this.maybeDailyReport();
@@ -159,6 +163,38 @@ export class AutonomyAgent extends BaseAgent {
             contentId: item.id,
           });
         }
+      }
+    }
+  }
+
+  /** Generate teaser images for upcoming posts missing media (self-run) */
+  private async ensureMediaForUpcoming(): Promise<void> {
+    if (!config.autonomy.generateMedia || !this.agents) return;
+    if (config.autonomy.level === "supervised") return;
+
+    const upcoming = await this.content.upcoming(20);
+    const needMedia = upcoming.filter(
+      (c) =>
+        c.mediaUrls.length === 0 &&
+        !c.metadata?.mediaGenerated &&
+        (c.contentType === "image" || c.contentType === "video" || c.contentType === "text")
+    );
+
+    // Limit gens per tick to protect budget
+    const batch = needMedia.slice(0, config.autonomy.level === "full" ? 3 : 1);
+    for (const item of batch) {
+      const theme = String(item.metadata?.theme ?? item.title ?? "teaser selfie");
+      const result = await this.agents.invoke("media", "generate_for_content", {
+        contentId: item.id,
+        theme: `${theme}, content creator selfie, teasing`,
+      });
+      if (result.ok) {
+        this.log.info({ contentId: item.id }, "autonomy attached generated media");
+      } else {
+        this.log.warn(
+          { contentId: item.id, message: result.message },
+          "autonomy media gen skipped"
+        );
       }
     }
   }
