@@ -22,4 +22,5 @@ COPY --from=build /app/src/db/migrations ./dist/db/migrations
 EXPOSE 3100
 USER node
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]
+# Migrations run inside the app when DATABASE_URL is present
+CMD ["node", "dist/index.js"]

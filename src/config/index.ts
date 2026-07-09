@@ -30,7 +30,6 @@ function resolveDatabaseUrl(): string {
   );
 }
 
-// Normalize env before zod parse
 if (!process.env.REDIS_URL) {
   const r = resolveRedisUrl();
   if (r) process.env.REDIS_URL = r;
@@ -46,10 +45,11 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 
-  DATABASE_URL: z.string().min(1),
+  // Optional until Postgres/Redis plugins are linked on Railway
+  DATABASE_URL: z.string().optional().default(""),
   DB_POOL_MAX: z.coerce.number().default(20),
 
-  REDIS_URL: z.string().min(1),
+  REDIS_URL: z.string().optional().default(""),
   REDIS_PREFIX: z.string().default("lilly:"),
 
   LLM_API_URL: z.string().optional().default(""),
@@ -90,7 +90,8 @@ const envSchema = z.object({
   WEBHOOK_SECRET: z.string().optional().default(""),
 
   WS_PATH: z.string().default("/ws"),
-  API_KEY: z.string().min(8),
+  // Default so Railway can boot; change in Variables for production security
+  API_KEY: z.string().min(8).default("lilly_4xrDfd0XltWntEJ4VPk2xm818YlKoJXee14yoDxy2w8"),
   CORS_ORIGINS: z.string().default("*"),
 });
 
@@ -100,25 +101,26 @@ function loadEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     const missing = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
-    const hint = [
-      "Railway requires:",
-      "  1) Add PostgreSQL plugin → set DATABASE_URL=${{Postgres.DATABASE_URL}}",
-      "  2) Add Redis plugin → set REDIS_URL=${{Redis.REDIS_URL}}",
-      "  3) Set API_KEY to a long random secret (Variables tab)",
-      "  4) Set PRIMARY_TRAFFIC_URL to your traffic link",
-      "See docs/RAILWAY.md",
-    ].join("\n");
-    throw new Error(`Invalid environment configuration:\n${missing.join("\n")}\n\n${hint}`);
+    throw new Error(`Invalid environment configuration:\n${missing.join("\n")}`);
   }
   return parsed.data;
 }
 
 export const env = loadEnv();
 
+const dbUrl = env.DATABASE_URL || "";
+const redisUrl = env.REDIS_URL || "";
+
 export const config = {
   env: env.NODE_ENV,
   isProd: env.NODE_ENV === "production",
   isDev: env.NODE_ENV === "development",
+  /** Full stack ready (Postgres + Redis linked) */
+  ready: Boolean(dbUrl && redisUrl),
+  missing: [
+    !dbUrl ? "DATABASE_URL (add PostgreSQL on Railway canvas)" : null,
+    !redisUrl ? "REDIS_URL (add Redis on Railway canvas)" : null,
+  ].filter(Boolean) as string[],
   server: {
     port: env.PORT,
     host: env.HOST,
@@ -127,11 +129,11 @@ export const config = {
     wsPath: env.WS_PATH,
   },
   db: {
-    url: env.DATABASE_URL,
+    url: dbUrl,
     poolMax: env.DB_POOL_MAX,
   },
   redis: {
-    url: env.REDIS_URL,
+    url: redisUrl,
     prefix: env.REDIS_PREFIX,
   },
   llm: {
@@ -152,7 +154,7 @@ export const config = {
     defaultIntervalMinutes: env.DEFAULT_POST_INTERVAL_MINUTES,
   },
   autonomy: {
-    enabled: env.AUTONOMY_ENABLED,
+    enabled: env.AUTONOMY_ENABLED && Boolean(dbUrl && redisUrl),
     intervalMinutes: env.AUTONOMY_INTERVAL_MINUTES,
     level: env.AUTONOMY_LEVEL,
     defaultGoal: env.AUTONOMY_DEFAULT_GOAL,

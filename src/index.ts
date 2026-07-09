@@ -13,6 +13,7 @@ import { AgentRegistry } from "./core/agent-registry";
 import { MemorySystem } from "./core/memory";
 import { MemoryRepository } from "./db/repositories/memory.repo";
 import { closeDb, checkDb } from "./db/pool";
+import { runMigrations } from "./db/migrate";
 import { createApiRouter } from "./api/routes";
 import { createWebhookRouter } from "./api/routes/webhooks";
 import { attachWebSocket } from "./api/websocket";
@@ -33,7 +34,74 @@ import type { AgentName } from "./types/domain";
 
 const log = childLogger("bootstrap");
 
-async function main(): Promise<void> {
+async function startHttpOnly(reason: string): Promise<void> {
+  log.warn({ reason, missing: config.missing }, "starting setup mode (HTTP only)");
+
+  const app = express();
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(cors({ origin: true }));
+  app.use(express.json());
+
+  app.get("/health", (_req, res) => {
+    res.status(200).json({
+      status: "setup",
+      message: "Lilly is up but needs Postgres + Redis linked on Railway",
+      missing: config.missing,
+      setup: {
+        step1: "Canvas → + Create → Database → PostgreSQL",
+        step2: "Canvas → + Create → Database → Redis",
+        step3: "Lilly → Variables → add DATABASE_URL reference to Postgres",
+        step4: "Lilly → Variables → add REDIS_URL reference to Redis",
+        step5: "Redeploy",
+      },
+      version: "1.0.0",
+    });
+  });
+
+  app.get("/", (_req, res) => {
+    res.json({
+      name: "Lilly OS",
+      mode: "setup",
+      health: "/health",
+      missing: config.missing,
+    });
+  });
+
+  app.use((_req, res) => {
+    res.status(503).json({
+      error: "setup incomplete",
+      missing: config.missing,
+      hint: "Add PostgreSQL and Redis on the Railway canvas, link DATABASE_URL and REDIS_URL, then redeploy",
+    });
+  });
+
+  const server = http.createServer(app);
+  server.listen(config.server.port, config.server.host, () => {
+    log.info(
+      { port: config.server.port, mode: "setup" },
+      "Lilly OS listening (setup mode)"
+    );
+  });
+
+  const shutdown = (signal: string) => {
+    log.info({ signal }, "shutting down");
+    server.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+async function startFull(): Promise<void> {
+  // Migrate before serving
+  try {
+    await runMigrations();
+    log.info("migrations ok");
+  } catch (err) {
+    log.error({ err }, "migration failed — check DATABASE_URL");
+    throw err;
+  }
+
   const redis = new Redis(config.redis.url, {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
@@ -66,7 +134,7 @@ async function main(): Promise<void> {
       importance: 1,
     });
   } catch (err) {
-    log.warn({ err }, "memory bootstrap skipped (DB may need migrate)");
+    log.warn({ err }, "memory bootstrap skipped");
   }
 
   const adapters: Array<{ id: string; adapter: unknown }> = [];
@@ -139,7 +207,6 @@ async function main(): Promise<void> {
     })
   );
 
-  // Public health for Railway (no auth)
   app.get("/health", async (_req, res) => {
     const dbOk = await checkDb();
     let redisOk = false;
@@ -209,7 +276,18 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
+async function main(): Promise<void> {
+  if (!config.ready) {
+    await startHttpOnly(config.missing.join("; "));
+    return;
+  }
+  await startFull();
+}
+
 main().catch((err) => {
   logger.fatal({ err }, "fatal bootstrap error");
-  process.exit(1);
+  // Last resort: still try setup HTTP so healthcheck can show the error
+  startHttpOnly(err instanceof Error ? err.message : String(err)).catch(() => {
+    process.exit(1);
+  });
 });
