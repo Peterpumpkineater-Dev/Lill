@@ -65,7 +65,12 @@ class FalMediaAdapter implements IMediaAdapter {
     };
     if (req.negativePrompt) body.negative_prompt = req.negativePrompt;
     if (config.media.loraPathOrUrl) {
-      body.loras = [{ path: config.media.loraPathOrUrl, scale: 1 }];
+      body.loras = [
+        {
+          path: config.media.loraPathOrUrl,
+          scale: config.media.loraScale ?? 1,
+        },
+      ];
     }
 
     const res = await fetch(endpoint, {
@@ -115,12 +120,17 @@ export function createMediaAdapter(): IMediaAdapter {
 /** Build a likeness-aware prompt for Lilly */
 export function buildLillyImagePrompt(userRequest: string): string {
   const trigger = config.media.loraTrigger;
-  const base = [
-    `photo of ${trigger}, adult woman content creator`,
-    userRequest.replace(/\n/g, " ").slice(0, 400),
-    "high quality, detailed, social media photo",
-  ]
-    .filter(Boolean)
-    .join(", ");
-  return base;
+  // Keep trigger early so LoRA identity sticks in cloud gens
+  const cleaned = userRequest
+    .replace(/\n/g, " ")
+    .replace(/\b(send me|show me|pic|picture|photo|selfie|image|please)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 350);
+  return [
+    trigger,
+    `photo of ${trigger}, adult woman, content creator`,
+    cleaned || "teasing social media selfie",
+    "same person, consistent face, high quality, detailed",
+  ].join(", ");
 }

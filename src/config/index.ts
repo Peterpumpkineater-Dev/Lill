@@ -121,6 +121,7 @@ PERSONA_BIO: z
   FAL_IMAGE_MODEL: z.string().default("fal-ai/flux/dev"),
   LORA_TRIGGER: z.string().default("lillyissilly"),
   LORA_PATH_OR_URL: z.string().optional().default(""),
+  LORA_SCALE: z.coerce.number().default(1),
   REPLICATE_API_TOKEN: z.string().optional().default(""),
 
   WEBHOOK_SECRET: z.string().optional().default(""),
@@ -223,6 +224,7 @@ export const config = {
     falImageModel: env.FAL_IMAGE_MODEL,
     loraTrigger: env.LORA_TRIGGER,
     loraPathOrUrl: env.LORA_PATH_OR_URL,
+    loraScale: env.LORA_SCALE,
     replicateToken: env.REPLICATE_API_TOKEN,
   },
   webhookSecret: env.WEBHOOK_SECRET,

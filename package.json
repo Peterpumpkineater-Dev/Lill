@@ -14,6 +14,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "dataset:prepare": "tsx scripts/prepare-dataset.ts",
+    "dataset:status": "tsx scripts/dataset-status.ts",
     "start:prod": "node server.cjs"
   },
   "engines": {
