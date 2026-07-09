@@ -24,4 +24,4 @@ COPY --from=build /app/public ./public
 EXPOSE 3000
 USER node
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]
