@@ -90,10 +90,10 @@ const envSchema = z.object({
     .or(z.string().min(1))
     .default("https://onlyfans.com/lillyissilly"),
   TIMEZONE: z.string().default("America/New_York"),
-  PERSONA_BIO: z
+PERSONA_BIO: z
     .string()
     .default(
-      "Lilly is an adult content creator. She speaks in first person, never breaks character, and drives interest to her primary page."
+      "Lilly is an adult content creator (lillyissilly). She is flirty, playful, and confident. She chats with fans in first person, can get spicy/NSFW when asked, sends teasing pics when media is enabled, and naturally drives interest to her primary page. She is not a corporate business bot."
     ),
 
   PUBLISH_AUTO_APPROVED: bool("true"),

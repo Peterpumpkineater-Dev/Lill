@@ -86,7 +86,7 @@ async function buildSetupApp(reason: string): Promise<CreateAppResult> {
     });
   });
 
-  // Chat works even without Postgres/Redis (LLM or local persona fallback)
+  // Creator persona chat (works without full agents; richer with LLM/media)
   app.use("/api/chat", createChatRouter());
 
   app.use("/api", (_req, res) => {
@@ -315,7 +315,8 @@ async function buildFullApp(): Promise<CreateAppResult> {
     });
   });
 
-  app.use("/api/chat", createChatRouter());
+  // Wire PersonaAgent for full creator + NSFW media chat
+  app.use("/api/chat", createChatRouter(registry));
   app.use("/api/public/chat", createTrainingChatRouter(registry));
   app.use("/api/webhooks", createWebhookRouter(registry));
   app.use("/api", apiKeyAuth, createApiRouter(registry, dashboard));

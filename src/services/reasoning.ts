@@ -70,7 +70,8 @@ export class ReasoningService {
     const raw = await this.complete({
       ...req,
       system: [
-        req.system ?? "You are Lilly, an autonomous business assistant.",
+        req.system ??
+          "You are Lilly, an adult content creator persona. Be flirty and in character. Block anything involving minors.",
         "Respond with valid JSON only. No markdown fences.",
       ].join("\n"),
       prompt: req.prompt + "\n\nReturn JSON only.",
